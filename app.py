@@ -1,72 +1,83 @@
 import streamlit as st
-from groq import Groq
-import tempfile
+import subprocess
 import os
+import tempfile
+from groq import Groq
 
-# Page Configuration
-st.set_page_config(page_title="AI Subtitle Generator", page_icon="🎬", layout="centered")
+# 1. Fetch API key automatically from Streamlit Secrets or manual input
+api_key = st.secrets.get("GROQ_API_KEY") or os.environ.get("GROQ_API_KEY")
 
-st.title("🎬 Fast AI Subtitle Generator")
-st.write("Generate `.srt` subtitles for your audio or video in seconds.")
+if not api_key:
+    api_key = st.sidebar.text_input("Enter Groq API Key", type="password")
 
-# Sidebar for Groq API Key input
-api_key = st.sidebar.text_input("Enter Groq API Key", type="password")
+if not api_key:
+    st.warning("Please provide a Groq API Key in Secrets or the sidebar to proceed.")
+    st.stop()
 
-# File Upload Dropzone
-uploaded_file = st.file_uploader("Upload Audio or Video File", type=["mp3", "wav", "mp4", "m4a"])
+# Initialize Groq client
+client = Groq(api_key=api_key)
 
-if uploaded_file is not None:
-    st.success(f"File attached: {uploaded_file.name}")
+# 2. Fast MP4 to MP3 extraction function
+def convert_mp4_to_mp3(video_file):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_mp4:
+        tmp_mp4.write(video_file.getvalue())
+        tmp_mp4_path = tmp_mp4.name
+
+    tmp_mp3_path = tmp_mp4_path.replace(".mp4", ".mp3")
+
+    # Extract audio fast at 128kbps (bypasses 25MB limit)
+    command = [
+        "ffmpeg", "-y",
+        "-i", tmp_mp4_path,
+        "-vn",
+        "-b:a", "128k",
+        "-ar", "44100",
+        tmp_mp3_path
+    ]
     
-    if st.button("🚀 Generate Subtitles", type="primary"):
-        if not api_key:
-            st.error("Please enter your Groq API Key in the left sidebar first!")
-        else:
-            with st.spinner("Processing audio with Groq AI..."):
-                try:
-                    # Save temporary file to process
-                    suffix = os.path.splitext(uploaded_file.name)[1]
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
-                        tmp_file.write(uploaded_file.read())
-                        tmp_path = tmp_file.name
+    subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
+    # Clean up input video immediately
+    os.remove(tmp_mp4_path)
 
-                    # Connect to Groq AI engine
-                    client = Groq(api_key=api_key)
-                    with open(tmp_path, "rb") as file:
-                        transcription = client.audio.transcriptions.create(
-                            file=(uploaded_file.name, file.read()),
-                            model="whisper-large-v3-turbo",
-                            response_format="verbose_json"
-                        )
+    return tmp_mp3_path
 
-                    # Timestamp formatter to convert seconds into standard SRT format
-                    def format_timestamp(seconds: float) -> str:
-                        hours = int(seconds // 3600)
-                        minutes = int((seconds % 3600) // 60)
-                        secs = int(seconds % 60)
-                        millis = int((seconds - int(seconds)) * 1000)
-                        return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
-                    srt_content = ""
-                    for i, segment in enumerate(transcription.segments, start=1):
-                        start_time = format_timestamp(segment['start'])
-                        end_time = format_timestamp(segment['end'])
-                        text = segment['text'].strip()
-                        srt_content += f"{i}\n{start_time} --> {end_time}\n{text}\n\n"
+# 3. Streamlit Interface
+st.title("⚡ Video Subtitle Generator")
 
-                    # Delete temp file
-                    os.remove(tmp_path)
+uploaded_video = st.file_uploader("Upload MP4 Video (up to 200MB)", type=["mp4"])
 
-                    # Display results & download button
-                    st.subheader("Subtitles Ready!")
-                    st.text_area("Preview Subtitles", srt_content, height=200)
+if uploaded_video is not None:
+    if st.button("Generate Subtitles"):
+        
+        # Step A: Convert to lightweight MP3
+        with st.spinner("Extracting audio from video (2–5 secs)..."):
+            mp3_path = convert_mp4_to_mp3(uploaded_video)
 
-                    st.download_button(
-                        label="📥 Download .SRT File",
-                        data=srt_content,
-                        file_name=f"{os.path.splitext(uploaded_file.name)[0]}.srt",
-                        mime="text/plain"
-                    )
+        # Step B: Pass directly to Groq Whisper
+        with st.spinner("Transcribing with Whisper..."):
+            with open(mp3_path, "rb") as audio_file:
+                transcription = client.audio.transcriptions.create(
+                    file=(os.path.basename(mp3_path), audio_file.read()),
+                    model="whisper-large-v3-turbo",
+                    response_format="srt"  # Change to "verbose_json" or "text" if needed
+                )
 
-                except Exception as e:
-                    st.error(f"Error encountered: {e}")
+        # Clean up temporary MP3 file
+        if os.path.exists(mp3_path):
+            os.remove(mp3_path)
+
+        st.success("Subtitles ready!")
+        
+        # Display subtitles
+        st.subheader("Generated Subtitles")
+        st.code(transcription, language="srt")
+
+        # Provide subtitle download option
+        st.download_button(
+            label="Download .SRT Subtitle File",
+            data=transcription,
+            file_name="subtitles.srt",
+            mime="text/plain"
+        )
