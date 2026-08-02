@@ -293,3 +293,36 @@ with right_col:
                     os.remove(processed_audio_path)
     else:
         st.info("Upload any media file on the left, select target language, and click **Process**.")
+
+# -----------------------------------------------------------------------------
+# 5. SEO & SEARCH ENGINE INDEXING SECTION
+# -----------------------------------------------------------------------------
+st.markdown("<br><hr style='border-color: rgba(255,255,255,0.1); margin: 40px 0;'><br>", unsafe_allow_html=True)
+
+seo_col1, seo_col2 = st.columns(2)
+
+with seo_col1:
+    st.markdown("""
+    ### ⚡ Free AI Subtitle Generator & Multi-Language Translator
+    Welcome to **AI Subtitle Studio Pro**, the fastest online tool for generating accurate timestamps and translating video subtitles. 
+    Powered by **OpenAI Whisper-large-v3** and **Llama 3.3 70B**, our app transforms raw video and audio into production-ready `.srt` and `.txt` files.
+
+    #### Key Features:
+    * **High-Accuracy Speech-to-Text:** Extract audio directly from MP4, MP3, WAV, MOV, and MKV files.
+    * **Automated Audio Pre-Processing:** Integrated FFmpeg converts uploads into clean 16kHz mono FLAC tracks for maximum accuracy.
+    * **Instant Multilingual Translation:** Automatically translate speech into Urdu, Spanish, French, German, Japanese, Chinese, Arabic, and Hindi.
+    """)
+
+with seo_col2:
+    st.markdown("""
+    ### ❓ Frequently Asked Questions (FAQ)
+
+    **Q: How do I generate `.srt` subtitles for YouTube or video editing?**  
+    *A: Upload your media file, choose your target language, and click "Process". Once rendered, click the "Download Subtitle File" button to save your `.srt` file.*
+
+    **Q: Is AI Subtitle Studio free to use?**  
+    *A: Yes! Our studio runs ultra-fast Groq acceleration to provide high-speed AI transcription and translation completely free.*
+
+    **Q: What audio and video formats are supported?**  
+    *A: We support MP4, MP3, WAV, M4A, MOV, MKV, FLAC, and OGG formats.*
+    """)
