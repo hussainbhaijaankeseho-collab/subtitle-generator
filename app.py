@@ -85,28 +85,14 @@ CUSTOM_CSS = """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ----------------------------------------------------
-# 1. Sidebar User Profile & Authentication Widget
+# 1. Sidebar Platform Info (Google Login Removed)
 # ----------------------------------------------------
-st.sidebar.title("👤 Account")
-
-try:
-    is_logged_in = st.user.is_logged_in
-except Exception:
-    is_logged_in = False
-
-if is_logged_in:
-    st.sidebar.markdown(f"Logged in as:\n**{st.user.name}**")
-    st.sidebar.caption(f"Email: {st.user.email}")
-    st.sidebar.button("🚪 Log Out", on_click=st.logout, use_container_width=True)
-else:
-    st.sidebar.info("🔒 Log in to process media and export files.")
-    st.sidebar.button("🔑 Log in with Google", on_click=st.login, type="primary", use_container_width=True)
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("⚡ Platform Capabilities")
+st.sidebar.title("⚡ Platform Capabilities")
 st.sidebar.write("• **Whisper v3**: Ultra-fast transcription")
 st.sidebar.write("• **Llama 3.3 70B**: Context-aware translation")
 st.sidebar.write("• **FFmpeg Engine**: MP4/MKV/WAV audio conversion")
+st.sidebar.markdown("---")
+st.sidebar.caption("AI Subtitle Studio Pro is ready for instant media processing.")
 
 # ----------------------------------------------------
 # 2. Helper Functions
@@ -185,13 +171,10 @@ with col_right:
     st.info("Uploaded content outputs and generated .srt timestamps will appear here once processed.")
 
 # ----------------------------------------------------
-# 4. Processing Execution
+# 4. Processing Execution (Direct & Unrestricted)
 # ----------------------------------------------------
 if process_btn:
-    if not is_logged_in:
-        st.warning("🔐 Authentication Required: Please click **Log in with Google** in the left sidebar to process your file.")
-        st.button("🔑 Sign in with Google to Continue", on_click=st.login, type="primary")
-    elif not uploaded_file:
+    if not uploaded_file:
         st.error("Please upload a video or audio file first!")
     else:
         api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
@@ -287,8 +270,8 @@ with faq_col1:
     with st.expander("❓ Which file formats are supported?"):
         st.write("We support `.mp4`, `.mp3`, `.wav`, `.mkv`, `.mov`, and `.flac` files up to Streamlit's standard upload limit.")
 
-    with st.expander("❓ Why is Google Login required to generate subtitles?"):
-        st.write("Google login ensures fair usage across all users and prevents automated bot spam.")
+    with st.expander("❓ Do I need an account to generate subtitles?"):
+        st.write("No account or login is required. You can upload media and download your `.srt` and `.txt` files instantly.")
 
 with faq_col2:
     with st.expander("❓ Can I translate subtitles to other languages?"):
