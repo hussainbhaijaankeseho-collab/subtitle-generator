@@ -13,37 +13,48 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom High-Contrast Dark Theme & Glassmorphism Styling
+# High-Contrast Bright Dark Theme CSS
 CUSTOM_CSS = """
 <style>
+    /* App Base Background & Main Font Colors */
     .stApp {
         background-color: #0E1117;
-        color: #FAFAFA;
+        color: #FFFFFF !important;
     }
     
-    h1 {
+    /* Force Bright Headers & Titles */
+    h1, h2, h3, h4, .stHeader {
         color: #FFFFFF !important;
         font-weight: 700 !important;
-        letter-spacing: -0.5px;
     }
 
-    h3, .stSubheader {
-        color: #E0E0E0 !important;
+    /* Force Bright Labels for Inputs, Captions, and Form Titles */
+    label, .stCaption, p, span, div {
+        color: #E0E6ED !important;
+    }
+
+    /* Streamlit Metrics (Fixes Dark Large v3 / Llama Text) */
+    div[data-testid="stMetricValue"] > div {
+        color: #00FFCC !important;
+        font-weight: 700 !important;
+        font-size: 1.8rem !important;
+    }
+    div[data-testid="stMetricLabel"] > div {
+        color: #FFFFFF !important;
         font-weight: 600 !important;
     }
 
-    /* Glassmorphic Cards & Containers */
+    /* Glassmorphic Containers */
     div[data-testid="stVerticalBlock"] > div[style*="flex"] {
-        background: rgba(255, 255, 255, 0.03);
+        background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
         border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
         padding: 1.5rem;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     }
 
-    /* Primary Red Gradient Buttons */
+    /* Primary Accent Buttons */
     .stButton > button {
         background: linear-gradient(135deg, #FF4B4B 0%, #B30000 100%) !important;
         color: #FFFFFF !important;
@@ -51,40 +62,29 @@ CUSTOM_CSS = """
         border-radius: 8px !important;
         font-weight: 600 !important;
         padding: 0.6rem 1.2rem !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
     .stButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 20px rgba(255, 75, 75, 0.4) !important;
     }
 
-    /* Output Code / Text Area */
+    /* Text Area Output */
     textarea {
         background-color: #161B22 !important;
         color: #00FFCC !important;
         border: 1px solid #30363D !important;
         border-radius: 8px !important;
         font-family: 'Fira Code', 'Courier New', monospace !important;
-        font-size: 0.9rem !important;
     }
 
-    /* File Uploader Box */
-    div[data-testid="stFileUploader"] {
-        background-color: #161B22;
-        border: 1px stroke #30363D;
-        border-radius: 10px;
-        padding: 10px;
-    }
-
-    /* Selectbox Input */
-    div[data-baseweb="select"] > div {
+    /* Info Alert Box Styling (Fixes Output Box Text) */
+    div[data-testid="stAlert"] {
         background-color: #161B22 !important;
-        border-color: #30363D !important;
-        color: #FAFAFA !important;
-        border-radius: 8px !important;
+        border: 1px solid #30363D !important;
+        color: #00FFCC !important;
     }
 
-    /* Dark Sidebar Styling */
+    /* Dark Sidebar */
     section[data-testid="stSidebar"] {
         background-color: #161B22 !important;
         border-right: 1px solid #30363D !important;
@@ -156,12 +156,11 @@ def translate_text(client: Groq, text: str, target_language: str) -> str:
     return response.choices[0].message.content.strip()
 
 # ----------------------------------------------------
-# 3. Main Dashboard Layout (Fully Public)
+# 3. Main Dashboard Layout (Fully Public & High Contrast)
 # ----------------------------------------------------
 st.title("🎬 AI Subtitle Studio Pro")
 st.caption("Powered by FFmpeg, Groq Whisper v3, and Llama 3.3 70B")
 
-# Top Highlights
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Whisper Model", "Large v3")
 col2.metric("Translation LLM", "Llama 3.3 70B")
@@ -186,10 +185,10 @@ with col_left:
 
 with col_right:
     st.subheader("📝 Subtitle Studio Output")
-    st.info("Uploaded content outputs and generated `.srt` timestamps will appear here once processed.")
+    st.info("Uploaded content outputs and generated .srt timestamps will appear here once processed.")
 
 # ----------------------------------------------------
-# 4. Processing Execution (Requires Google Sign-in)
+# 4. Processing Execution
 # ----------------------------------------------------
 if process_btn:
     if not st.user.is_logged_in:
@@ -206,17 +205,14 @@ if process_btn:
             status = st.empty()
             
             try:
-                # Save uploaded temp file
                 ext = os.path.splitext(uploaded_file.name)[1]
                 with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
                     tmp.write(uploaded_file.read())
                     tmp_input_path = tmp.name
 
-                # 1. Extract Audio
                 status.info("⏳ Step 1/3: Extracting audio via FFmpeg...")
                 audio_path = extract_audio(tmp_input_path)
 
-                # 2. Transcribe
                 status.info("⏳ Step 2/3: Transcribing audio with Groq Whisper v3...")
                 with open(audio_path, "rb") as f:
                     transcription = client.audio.transcriptions.create(
@@ -225,7 +221,6 @@ if process_btn:
                         response_format="verbose_json",
                     )
 
-                # 3. Format & Translate
                 status.info("⏳ Step 3/3: Formatting subtitles & translating via Llama 3.3...")
                 srt_content = ""
                 txt_content = ""
@@ -249,7 +244,6 @@ if process_btn:
                     txt_content = raw_text
                     srt_content = f"1\n00:00:00,000 --> 00:05:00,000\n{raw_text}\n\n"
 
-                # Cleanup temp files
                 if os.path.exists(tmp_input_path):
                     os.remove(tmp_input_path)
                 if os.path.exists(audio_path):
@@ -257,7 +251,6 @@ if process_btn:
 
                 status.empty()
 
-                # Render Results
                 with col_right:
                     st.success("✨ Subtitles generated successfully!")
                     st.text_area("SRT Preview", srt_content, height=260)
@@ -283,7 +276,7 @@ if process_btn:
                 st.error(f"Error processing file: {e}")
 
 # ----------------------------------------------------
-# 5. Public Platform Features & FAQ Section
+# 5. Public FAQ Section
 # ----------------------------------------------------
 st.markdown("<br><hr><br>", unsafe_allow_html=True)
 st.subheader("💡 Frequently Asked Questions & Features")
@@ -292,20 +285,20 @@ faq_col1, faq_col2 = st.columns(2)
 
 with faq_col1:
     with st.expander("❓ How does the subtitle generation work?"):
-        st.write("When you upload a video or audio file, FFmpeg extracts the high-quality audio track locally on the server. The audio is sent to Groq's Whisper v3 hardware for near-instant transcription, and optionally translated using Llama 3.3.")
+        st.write("When you upload a video or audio file, FFmpeg extracts the audio track locally. The audio is sent to Groq's Whisper v3 engine for fast transcription, and translated using Llama 3.3.")
 
     with st.expander("❓ Which file formats are supported?"):
         st.write("We support `.mp4`, `.mp3`, `.wav`, `.mkv`, `.mov`, and `.flac` files up to Streamlit's standard upload limit.")
 
     with st.expander("❓ Why is Google Login required to generate subtitles?"):
-        st.write("Google login ensures fair usage across all users and prevents automated bot spam from overloading the API infrastructure.")
+        st.write("Google login ensures fair usage across all users and prevents automated bot spam.")
 
 with faq_col2:
     with st.expander("❓ Can I translate subtitles to other languages?"):
-        st.write("Yes! You can choose from English, Spanish, French, German, Japanese, Chinese, Arabic, Hindi, and Urdu. The Llama 3.3 70B model translates each segment while maintaining natural timing.")
+        st.write("Yes! You can choose from English, Spanish, French, German, Japanese, Chinese, Arabic, Hindi, and Urdu.")
 
     with st.expander("❓ What download formats are provided?"):
-        st.write("You receive both standard `.srt` files (with precise timestamps ready to import into Premiere Pro, DaVinci Resolve, or YouTube) and clean `.txt` full transcriptions.")
+        st.write("You receive both standard `.srt` files and clean `.txt` full transcriptions.")
 
     with st.expander("❓ Are my uploaded files saved on the server?"):
-        st.write("No. Temporary files are processed inside isolated memory paths and deleted immediately after subtitle generation.")
+        st.write("No. Files are deleted immediately after subtitle generation.")
