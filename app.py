@@ -6,7 +6,7 @@ import datetime
 import subprocess
 
 # -----------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & GLASSMORPHISM UI STYLING
+# 1. PAGE CONFIGURATION & CLEAN UI STYLING
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="AI Subtitle Studio Pro | Free Automated Subtitles & Translations",
@@ -19,44 +19,70 @@ st.set_page_config(
     }
 )
 
-# Custom Glassmorphism UI Styling
+# High-contrast, crystal clear UI styling
 st.markdown("""
 <style>
-/* Main Background & Layout */
+/* Main Background */
 .stApp {
-    background-color: #0e1117;
+    background-color: #0d1117;
 }
 
-/* Glassmorphism Card Container */
+/* Headings and Text Color Fixes */
+h1, h2, h3, h4, h5, h6 {
+    color: #f0f6fc !important;
+    font-weight: 700 !important;
+}
+
+p, span, label, li {
+    color: #c9d1d9 !important;
+}
+
+/* Accent Header Styling */
+.title-accent {
+    color: #58a6ff !important;
+}
+
+/* Card Boxes */
 div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] {
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(10px);
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 1.2rem;
+    background: #161b22;
+    border-radius: 10px;
+    border: 1px solid #30363d;
+    padding: 1.5rem;
 }
 
 /* Buttons Styling */
 .stButton > button {
-    border-radius: 8px;
-    font-weight: 600;
-    transition: all 0.2s ease-in-out;
+    background-color: #238636 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    padding: 0.6rem 1rem !important;
+    transition: background-color 0.2s ease-in-out !important;
 }
 
 .stButton > button:hover {
-    transform: translateY(-2px);
+    background-color: #2ea043 !important;
 }
 
 /* Download Buttons Accent */
 div[data-testid="stDownloadButton"] > button {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #ffffff;
+    background-color: #21262d !important;
+    color: #58a6ff !important;
+    border: 1px solid #30363d !important;
+    border-radius: 6px !important;
 }
 
 div[data-testid="stDownloadButton"] > button:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.4);
+    background-color: #30363d !important;
+    border-color: #8b949e !important;
+}
+
+/* Input & Select Box styling */
+div[data-baseweb="select"] > div, div[data-baseweb="input"] > div {
+    background-color: #0d1117 !important;
+    border-color: #30363d !important;
+    color: #f0f6fc !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -115,13 +141,13 @@ def translate_text(client: Groq, text: str, target_language: str) -> str:
 # 3. HEADER & HERO SECTION
 # -----------------------------------------------------------------------------
 st.title("🎬 AI Subtitle Studio Pro")
-st.markdown("##### *Generate, Translate, and Export Subtitles instantly powered by Groq AI*")
+st.markdown("#### *Generate, Translate, and Export Subtitles instantly powered by Groq AI*")
 st.divider()
 
 col_desc1, col_desc2 = st.columns(2)
 with col_desc1:
     st.markdown("""
-    ### Key Features:
+    ### ⚡ Key Features
     * **High-Accuracy Speech-to-Text:** Extract audio directly from MP4, MP3, WAV, MKV, and FLAC files.
     * **Automated Audio Pre-Processing:** Integrated FFmpeg audio extraction & optimization.
     * **Instant Multilingual Translation:** Automatically translate speech to target languages via Llama 3.3.
@@ -129,7 +155,7 @@ with col_desc1:
 
 with col_desc2:
     st.markdown("""
-    ### Quick FAQ:
+    ### 💡 Quick FAQ
     * **Is it free?** Yes, powered by Groq's high-speed AI inference.
     * **What formats are supported?** MP4, MP3, WAV, MKV, MOV, FLAC, and OGG formats.
     """)
