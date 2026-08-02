@@ -5,93 +5,88 @@ import tempfile
 import datetime
 import subprocess
 
-# -----------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & DARK THEME STYLING
-# -----------------------------------------------------------------------------
+# Page Configuration
 st.set_page_config(
-    page_title="AI Subtitle Studio Pro | Free Automated Subtitles & Translations",
-    page_icon="🎬",
+    page_title="AI Subtitle Studio Pro", 
+    page_icon="🎬", 
     layout="wide",
-    initial_sidebar_state="expanded",
-    menu_items={
-        'Get Help': 'https://github.com/subtitle-generator',
-        'About': "# AI Subtitle Studio Pro\nGenerate, translate, and export `.srt` and `.txt` subtitles powered by Whisper v3 and Llama 3.3."
-    }
+    initial_sidebar_state="expanded"
 )
 
-# Custom High-Contrast Dark Styling
-st.markdown("""
+# Custom High-Contrast Dark Theme & Glassmorphism Styling
+CUSTOM_CSS = """
 <style>
-/* Main Canvas Dark Background */
-.stApp {
-    background-color: #0e1117 !important;
-}
+    /* Main Background & Fonts */
+    .stApp {
+        background-color: #0E1117;
+        color: #FAFAFA;
+    }
+    
+    /* Glassmorphic Container Cards */
+    div[data-testid="stVerticalBlock"] > div[style*="flex"] {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(10px);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 1.5rem;
+    }
 
-/* Bright Typography */
-h1, h2, h3, h4, h5, h6 {
-    color: #ffffff !important;
-    font-weight: 700 !important;
-}
+    /* Primary Accent Buttons */
+    .stButton > button {
+        background: linear-gradient(135deg, #FF4B4B 0%, #CC0000 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+    }
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
+    }
 
-p, span, label, li {
-    color: #e6edf3 !important;
-}
+    /* Text Area Styling */
+    textarea {
+        background-color: #161B22 !important;
+        color: #00FFCC !important;
+        border: 1px solid #30363D !important;
+        font-family: 'Courier New', monospace !important;
+    }
 
-/* Glassmorphic Container Cards */
-div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] {
-    background: #161b22 !important;
-    border-radius: 12px !important;
-    border: 1px solid #30363d !important;
-    padding: 1.5rem !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
-}
-
-/* Primary Action Button */
-.stButton > button {
-    background: linear-gradient(135deg, #238636 0%, #2ea043 100%) !important;
-    color: #ffffff !important;
-    border: none !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-    padding: 0.6rem 1rem !important;
-    box-shadow: 0 2px 8px rgba(46, 160, 67, 0.4) !important;
-    transition: all 0.2s ease-in-out !important;
-}
-
-.stButton > button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 4px 12px rgba(46, 160, 67, 0.6) !important;
-}
-
-/* Download Buttons */
-div[data-testid="stDownloadButton"] > button {
-    background: #21262d !important;
-    color: #58a6ff !important;
-    border: 1px solid #30363d !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-}
-
-div[data-testid="stDownloadButton"] > button:hover {
-    background: #30363d !important;
-    border-color: #58a6ff !important;
-}
-
-/* Input Fields & Dropdowns */
-div[data-baseweb="select"] > div, div[data-baseweb="input"] > div {
-    background-color: #0d1117 !important;
-    border-color: #30363d !important;
-    color: #ffffff !important;
-    border-radius: 8px !important;
-}
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        background-color: #161B22;
+        border-right: 1px solid #30363D;
+    }
 </style>
-""", unsafe_allow_html=True)
+"""
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# -----------------------------------------------------------------------------
-# 2. HELPER FUNCTIONS
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------
+# 1. Google Account Authentication Gate
+# ----------------------------------------------------
+if not st.user.is_logged_in:
+    col_a, col_b, col_c = st.columns([1, 2, 1])
+    with col_b:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.title("🔐 AI Subtitle Studio Pro")
+        st.markdown("---")
+        st.subheader("Sign in required")
+        st.write("Welcome! Authentication is required to access the high-performance AI subtitle transcription and translation suite.")
+        st.button("🔑 Log in with Google Account", on_click=st.login, type="primary", use_container_width=True)
+    st.stop()
+
+# User Sidebar Header
+st.sidebar.title("👤 User Profile")
+st.sidebar.markdown(f"Logged in as:\n**{st.user.name}**")
+st.sidebar.caption(f"Email: {st.user.email}")
+st.sidebar.button("🚪 Log Out", on_click=st.logout, use_container_width=True)
+
+# ----------------------------------------------------
+# 2. Helper Functions
+# ----------------------------------------------------
 def format_timestamp(seconds: float) -> str:
-    """Formats seconds into standard SRT timestamp format: HH:MM:SS,mmm"""
+    """Format seconds into SRT timestamp format HH:MM:SS,mmm"""
     td = datetime.timedelta(seconds=seconds)
     total_seconds = int(td.total_seconds())
     hours = total_seconds // 3600
@@ -101,35 +96,32 @@ def format_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
 def extract_audio(input_file_path: str) -> str:
-    """Extracts and converts input MP4 video or audio files to an optimized MP3 audio track using FFmpeg."""
+    """Extract audio from video using FFmpeg"""
     temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
     temp_audio_path = temp_audio.name
     temp_audio.close()
 
     cmd = [
-        "ffmpeg", "-y",
-        "-i", input_file_path,
-        "-vn",
-        "-acodec", "libmp3lame",
-        "-ar", "16000",
-        "-ac", "1",
-        "-q:a", "2",
+        "ffmpeg", "-y", "-i", input_file_path,
+        "-vn", "-acodec", "libmp3lame",
+        "-ar", "16000", "-ac", "1", "-q:a", "2",
         temp_audio_path
     ]
-    
     process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if process.returncode != 0:
-        raise Exception(f"FFmpeg MP4-to-audio extraction failed: {process.stderr.decode('utf-8')}")
-        
+        raise Exception(f"FFmpeg extraction error: {process.stderr.decode('utf-8')}")
     return temp_audio_path
 
 def translate_text(client: Groq, text: str, target_language: str) -> str:
-    """Translates text to target language using Groq Llama 3.3 model."""
+    """Translate subtitle segments using Groq Llama 3.3"""
     if target_language.lower() == "english":
         return text
 
-    prompt = f"Translate the following subtitle text to {target_language}. Maintain original tone and context. Output ONLY the translated text without extra explanation:\n\n{text}"
-    
+    prompt = (
+        f"Translate the following subtitle text to {target_language}. "
+        "Maintain tone and context. Return ONLY the translation, no explanation:\n\n"
+        f"{text}"
+    )
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
@@ -137,102 +129,71 @@ def translate_text(client: Groq, text: str, target_language: str) -> str:
     )
     return response.choices[0].message.content.strip()
 
-# -----------------------------------------------------------------------------
-# 3. HEADER & HERO SECTION
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------
+# 3. Main Application Dashboard
+# ----------------------------------------------------
 st.title("🎬 AI Subtitle Studio Pro")
-st.markdown("#### *Generate, Translate, and Export Subtitles instantly powered by Whisper v3 and Llama 3.3*")
-st.divider()
+st.caption("Powered by FFmpeg, Groq Whisper v3, and Llama 3.3")
 
-col_desc1, col_desc2 = st.columns(2)
-with col_desc1:
-    st.markdown("""
-    ### ⚡ Key Features:
-    * **MP4 to Audio Converter:** Automatic background extraction converting MP4 video tracks directly into optimized audio format using FFmpeg.
-    * **High-Accuracy Speech-to-Text:** Ultra-fast speech recognition powered by Groq **Whisper v3**.
-    * **Instant Multilingual Translation:** Powered by **Llama 3.3 (70B)** to translate subtitles seamlessly into your selected target language.
-    """)
+col_left, col_right = st.columns([1, 1])
 
-with col_desc2:
-    st.markdown("""
-    ### 💡 Quick FAQ:
-    * **Is it free?** Yes, completely free powered by Groq AI hardware acceleration.
-    * **What formats are supported?** High-speed processing for MP4, MP3, WAV, MKV, MOV, FLAC, and OGG formats.
-    * **What can I export?** Downloadable `.srt` and `.txt` format outputs.
-    """)
-
-st.divider()
-
-# -----------------------------------------------------------------------------
-# 4. APP INTERFACE & LOGIC
-# -----------------------------------------------------------------------------
-col_input, col_output = st.columns([1, 1])
-
-with col_input:
-    st.subheader("📥 Media Upload & Options")
-    
+with col_left:
+    st.subheader("📥 Input & Configuration")
     target_lang = st.selectbox(
-        "Select Target Subtitle Language",
+        "Select Target Language for Subtitles",
         ["English", "Spanish", "French", "German", "Japanese", "Chinese", "Arabic", "Hindi", "Urdu"]
     )
-    
     uploaded_file = st.file_uploader(
-        "Upload Video or Audio File (MP4, MP3, WAV, MKV, etc.)", 
-        type=["mp4", "mp3", "wav", "mkv", "mov", "flac", "ogg", "m4a"]
+        "Upload Video or Audio File", 
+        type=["mp4", "mp3", "wav", "mkv", "mov", "flac"]
     )
-    
     process_btn = st.button("🚀 Process & Generate Subtitles", type="primary", use_container_width=True)
 
-with col_output:
-    st.subheader("📝 Subtitle Studio Output")
-    
-    if not uploaded_file and not process_btn:
-        st.info("Upload any media file on the left, select target language, and click Process.")
+with col_right:
+    st.subheader("📝 Subtitle Output Studio")
 
-# Process Execution
 if process_btn:
     if not uploaded_file:
-        st.error("Please upload a media file first!")
+        st.error("Please upload a media file first.")
     else:
         api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
-        
         if not api_key:
-            st.error("Groq API key missing. Please add `GROQ_API_KEY` to Streamlit secrets.")
+            st.error("GROQ_API_KEY missing from secrets.")
         else:
             client = Groq(api_key=api_key)
-            status_box = st.empty()
+            status = st.empty()
             
             try:
-                file_ext = os.path.splitext(uploaded_file.name)[1]
-                with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
-                    tmp_file.write(uploaded_file.read())
-                    tmp_input_path = tmp_file.name
+                # 1. Save input file locally
+                ext = os.path.splitext(uploaded_file.name)[1]
+                with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+                    tmp.write(uploaded_file.read())
+                    tmp_input_path = tmp.name
 
-                # 1. Extract audio via FFmpeg
-                status_box.info("⏳ 1/3 Running FFmpeg MP4 to Audio Converter...")
+                # 2. FFmpeg Extraction
+                status.info("⏳ Step 1/3: Extracting audio via FFmpeg...")
                 audio_path = extract_audio(tmp_input_path)
 
-                # 2. Transcribe via Groq Whisper API
-                status_box.info("⏳ 2/3 Transcribing speech with Whisper v3...")
-                with open(audio_path, "rb") as file_to_transcribe:
+                # 3. Groq Whisper Transcription
+                status.info("⏳ Step 2/3: Transcribing audio with Groq Whisper v3...")
+                with open(audio_path, "rb") as f:
                     transcription = client.audio.transcriptions.create(
-                        file=(os.path.basename(audio_path), file_to_transcribe.read()),
+                        file=(os.path.basename(audio_path), f.read()),
                         model="whisper-large-v3",
                         response_format="verbose_json",
                     )
 
-                # 3. Format Subtitles / Translate via Llama 3.3
-                status_box.info("⏳ 3/3 Formatting subtitles and translating via Llama 3.3...")
+                # 4. Processing & Llama 3.3 Translation
+                status.info("⏳ Step 3/3: Generating subtitle formatting & translating...")
                 srt_content = ""
                 txt_content = ""
-
                 segments = getattr(transcription, 'segments', [])
-                
+
                 if segments:
-                    for idx, segment in enumerate(segments, start=1):
-                        start = format_timestamp(segment['start'])
-                        end = format_timestamp(segment['end'])
-                        text = segment['text'].strip()
+                    for idx, seg in enumerate(segments, start=1):
+                        start = format_timestamp(seg['start'])
+                        end = format_timestamp(seg['end'])
+                        text = seg['text'].strip()
 
                         if target_lang != "English":
                             text = translate_text(client, text, target_lang)
@@ -252,32 +213,29 @@ if process_btn:
                 if os.path.exists(audio_path):
                     os.remove(audio_path)
 
-                status_box.empty()
+                status.empty()
 
-                # Output
-                with col_output:
-                    st.success("✨ Subtitles generated successfully!")
-                    
+                # Render Output
+                with col_right:
+                    st.success("✨ Subtitles processed successfully!")
                     st.text_area("SRT Preview", srt_content, height=260)
                     
-                    dl_col1, dl_col2 = st.columns(2)
-                    with dl_col1:
+                    d1, d2 = st.columns(2)
+                    with d1:
                         st.download_button(
-                            label="📥 Download .SRT",
-                            data=srt_content,
+                            "📥 Download .SRT",
+                            srt_content,
                             file_name=f"{os.path.splitext(uploaded_file.name)[0]}.srt",
-                            mime="text/plain",
                             use_container_width=True
                         )
-                    with dl_col2:
+                    with d2:
                         st.download_button(
-                            label="📥 Download .TXT",
-                            data=txt_content,
+                            "📥 Download .TXT",
+                            txt_content,
                             file_name=f"{os.path.splitext(uploaded_file.name)[0]}.txt",
-                            mime="text/plain",
                             use_container_width=True
                         )
 
             except Exception as e:
-                status_box.empty()
-                st.error(f"An error occurred during processing: {str(e)}")
+                status.empty()
+                st.error(f"Error encountered during execution: {e}")
