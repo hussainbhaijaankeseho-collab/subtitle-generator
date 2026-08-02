@@ -6,7 +6,7 @@ import datetime
 import subprocess
 
 # -----------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & GLASSMORPHISM UI STYLING (SEO METADATA UPDATED)
+# 1. PAGE CONFIGURATION & GLASSMORPHISM UI STYLING (FULL SEO METADATA)
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="AI Subtitle Studio Pro | Free Automated Subtitles & Translations",
@@ -91,7 +91,57 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. AUDIO CONVERSION & PROCESSING ENGINE (FFmpeg)
+# 2. PUBLIC HEADER & METRICS (PUBLICLY VISIBLE TO GOOGLE)
+# -----------------------------------------------------------------------------
+st.markdown('<h1 class="main-title">🎬 AI Subtitle Studio Pro</h1>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">Automated Media Converter, Whisper Transcription & Llama Multi-Language Translation</p>', unsafe_allow_html=True)
+
+# App Metrics
+m1, m2, m3 = st.columns(3)
+with m1:
+    st.metric(label="Audio Converter", value="FFmpeg 16kHz", delta="Auto Mono")
+with m2:
+    st.metric(label="Speech-to-Text", value="Whisper v3", delta="Groq Accelerated")
+with m3:
+    st.metric(label="Translation Engine", value="Llama 3.3 70B", delta="Multilingual")
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# -----------------------------------------------------------------------------
+# 3. SEO & SEARCH ENGINE INDEXING SECTION (PUBLICLY VISIBLE TO GOOGLE)
+# -----------------------------------------------------------------------------
+seo_col1, seo_col2 = st.columns(2)
+
+with seo_col1:
+    st.markdown("""
+    ### ⚡ Free AI Subtitle Generator & Multi-Language Translator
+    Welcome to **AI Subtitle Studio Pro**, the fastest online tool for generating accurate timestamps and translating video subtitles. 
+    Powered by **OpenAI Whisper-large-v3** and **Llama 3.3 70B**, our app transforms raw video and audio into production-ready `.srt` and `.txt` files.
+
+    #### Key Features:
+    * **High-Accuracy Speech-to-Text:** Extract audio directly from MP4, MP3, WAV, MOV, and MKV files.
+    * **Automated Audio Pre-Processing:** Integrated FFmpeg converts uploads into clean 16kHz mono FLAC tracks for maximum accuracy.
+    * **Instant Multilingual Translation:** Automatically translate speech into Urdu, Spanish, French, German, Japanese, Chinese, Arabic, and Hindi.
+    """)
+
+with seo_col2:
+    st.markdown("""
+    ### ❓ Frequently Asked Questions (FAQ)
+
+    **Q: How do I generate `.srt` subtitles for YouTube or video editing?**  
+    *A: Sign in below, upload your media file, choose your target language, and click "Process". Once rendered, click the "Download Subtitle File" button to save your `.srt` file.*
+
+    **Q: Is AI Subtitle Studio free to use?**  
+    *A: Yes! Our studio runs ultra-fast Groq acceleration to provide high-speed AI transcription and translation completely free.*
+
+    **Q: What audio and video formats are supported?**  
+    *A: We support MP4, MP3, WAV, M4A, MOV, MKV, FLAC, and OGG formats.*
+    """)
+
+st.markdown("<hr style='border-color: rgba(255,255,255,0.1); margin: 35px 0;'>", unsafe_allow_html=True)
+
+# -----------------------------------------------------------------------------
+# 4. PROCESSING HELPER FUNCTIONS (FFmpeg & Groq)
 # -----------------------------------------------------------------------------
 def extract_and_convert_audio(input_file_path: str) -> str:
     """Uses FFmpeg to extract & convert any audio/video into lightweight 16kHz mono FLAC."""
@@ -132,28 +182,28 @@ def translate_text(groq_client, text: str, target_lang: str) -> str:
     return response.choices[0].message.content.strip()
 
 # -----------------------------------------------------------------------------
-# 3. NATIVE PERSISTENT AUTHENTICATION GATE
+# 5. NATIVE PERSISTENT AUTHENTICATION GATE
 # -----------------------------------------------------------------------------
 if not st.user.is_logged_in:
-    st.markdown("<br><br>", unsafe_allow_html=True)
     _, col2, _ = st.columns([1, 2, 1])
     
     with col2:
         st.markdown("""
         <div class="css-card" style="text-align: center;">
-            <h1 class="main-title">🔒 AI Subtitle Studio</h1>
-            <p class="sub-title">Automated multilingual subtitle generation powered by Groq & Whisper v3</p>
+            <h2 style="margin-bottom: 8px;">🔒 AI Subtitle Studio Access</h2>
+            <p style="color: #9CA3AF; font-size: 0.95rem;">Automated multilingual subtitle generation powered by Groq & Whisper v3</p>
             <hr style="border-color: rgba(255,255,255,0.1); margin: 20px 0;">
-            <p style="color: #D1D5DB;">Sign in to access the studio dashboard. Your session will remain remembered automatically.</p>
+            <p style="color: #D1D5DB;">Sign in to access the media upload dashboard. Your session will remain remembered automatically.</p>
         </div>
         """, unsafe_allow_html=True)
         
         st.button("🔑 Continue with Google", on_click=st.login, type="primary", use_container_width=True)
     
+    # Stops non-logged-in users and Google bots right here after reading public SEO above
     st.stop()
 
 # -----------------------------------------------------------------------------
-# 4. MAIN DASHBOARD (USER IS LOGGED IN)
+# 6. MAIN WORKSPACE DASHBOARD (AUTHENTICATED USER ONLY)
 # -----------------------------------------------------------------------------
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", "")
 
@@ -169,21 +219,6 @@ with st.sidebar:
     
     st.markdown("---")
     st.button("Log Out", on_click=st.logout, use_container_width=True, type="secondary")
-
-# Page Header
-st.markdown('<h1 class="main-title">🎬 AI Subtitle Studio Pro</h1>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">Automated Media Converter, Whisper Transcription & Llama Multi-Language Translation</p>', unsafe_allow_html=True)
-
-# App Metrics
-m1, m2, m3 = st.columns(3)
-with m1:
-    st.metric(label="Audio Converter", value="FFmpeg 16kHz", delta="Auto Mono")
-with m2:
-    st.metric(label="Speech-to-Text", value="Whisper v3", delta="Groq Accelerated")
-with m3:
-    st.metric(label="Translation Engine", value="Llama 3.3 70B", delta="Multilingual")
-
-st.markdown("<br>", unsafe_allow_html=True)
 
 # Dual Column App Workflow
 left_col, right_col = st.columns([1, 1], gap="large")
@@ -293,36 +328,3 @@ with right_col:
                     os.remove(processed_audio_path)
     else:
         st.info("Upload any media file on the left, select target language, and click **Process**.")
-
-# -----------------------------------------------------------------------------
-# 5. SEO & SEARCH ENGINE INDEXING SECTION
-# -----------------------------------------------------------------------------
-st.markdown("<br><hr style='border-color: rgba(255,255,255,0.1); margin: 40px 0;'><br>", unsafe_allow_html=True)
-
-seo_col1, seo_col2 = st.columns(2)
-
-with seo_col1:
-    st.markdown("""
-    ### ⚡ Free AI Subtitle Generator & Multi-Language Translator
-    Welcome to **AI Subtitle Studio Pro**, the fastest online tool for generating accurate timestamps and translating video subtitles. 
-    Powered by **OpenAI Whisper-large-v3** and **Llama 3.3 70B**, our app transforms raw video and audio into production-ready `.srt` and `.txt` files.
-
-    #### Key Features:
-    * **High-Accuracy Speech-to-Text:** Extract audio directly from MP4, MP3, WAV, MOV, and MKV files.
-    * **Automated Audio Pre-Processing:** Integrated FFmpeg converts uploads into clean 16kHz mono FLAC tracks for maximum accuracy.
-    * **Instant Multilingual Translation:** Automatically translate speech into Urdu, Spanish, French, German, Japanese, Chinese, Arabic, and Hindi.
-    """)
-
-with seo_col2:
-    st.markdown("""
-    ### ❓ Frequently Asked Questions (FAQ)
-
-    **Q: How do I generate `.srt` subtitles for YouTube or video editing?**  
-    *A: Upload your media file, choose your target language, and click "Process". Once rendered, click the "Download Subtitle File" button to save your `.srt` file.*
-
-    **Q: Is AI Subtitle Studio free to use?**  
-    *A: Yes! Our studio runs ultra-fast Groq acceleration to provide high-speed AI transcription and translation completely free.*
-
-    **Q: What audio and video formats are supported?**  
-    *A: We support MP4, MP3, WAV, M4A, MOV, MKV, FLAC, and OGG formats.*
-    """)
