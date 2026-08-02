@@ -16,24 +16,20 @@ st.set_page_config(
 # High-Contrast Bright Dark Theme CSS
 CUSTOM_CSS = """
 <style>
-    /* App Base Background & Main Font Colors */
     .stApp {
         background-color: #0E1117;
         color: #FFFFFF !important;
     }
     
-    /* Force Bright Headers & Titles */
     h1, h2, h3, h4, .stHeader {
         color: #FFFFFF !important;
         font-weight: 700 !important;
     }
 
-    /* Force Bright Labels for Inputs, Captions, and Form Titles */
     label, .stCaption, p, span, div {
         color: #E0E6ED !important;
     }
 
-    /* Streamlit Metrics (Fixes Dark Large v3 / Llama Text) */
     div[data-testid="stMetricValue"] > div {
         color: #00FFCC !important;
         font-weight: 700 !important;
@@ -44,7 +40,6 @@ CUSTOM_CSS = """
         font-weight: 600 !important;
     }
 
-    /* Glassmorphic Containers */
     div[data-testid="stVerticalBlock"] > div[style*="flex"] {
         background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(12px);
@@ -54,7 +49,6 @@ CUSTOM_CSS = """
         padding: 1.5rem;
     }
 
-    /* Primary Accent Buttons */
     .stButton > button {
         background: linear-gradient(135deg, #FF4B4B 0%, #B30000 100%) !important;
         color: #FFFFFF !important;
@@ -68,7 +62,6 @@ CUSTOM_CSS = """
         box-shadow: 0 4px 20px rgba(255, 75, 75, 0.4) !important;
     }
 
-    /* Text Area Output */
     textarea {
         background-color: #161B22 !important;
         color: #00FFCC !important;
@@ -77,14 +70,12 @@ CUSTOM_CSS = """
         font-family: 'Fira Code', 'Courier New', monospace !important;
     }
 
-    /* Info Alert Box Styling (Fixes Output Box Text) */
     div[data-testid="stAlert"] {
         background-color: #161B22 !important;
         border: 1px solid #30363D !important;
         color: #00FFCC !important;
     }
 
-    /* Dark Sidebar */
     section[data-testid="stSidebar"] {
         background-color: #161B22 !important;
         border-right: 1px solid #30363D !important;
@@ -97,12 +88,18 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 # 1. Sidebar User Profile & Authentication Widget
 # ----------------------------------------------------
 st.sidebar.title("👤 Account")
-if st.user.is_logged_in:
+
+try:
+    is_logged_in = st.user.is_logged_in
+except Exception:
+    is_logged_in = False
+
+if is_logged_in:
     st.sidebar.markdown(f"Logged in as:\n**{st.user.name}**")
     st.sidebar.caption(f"Email: {st.user.email}")
     st.sidebar.button("🚪 Log Out", on_click=st.logout, use_container_width=True)
 else:
-    st.sidebar.info("🔒 Log in to process media and export `.srt` or `.txt` files.")
+    st.sidebar.info("🔒 Log in to process media and export files.")
     st.sidebar.button("🔑 Log in with Google", on_click=st.login, type="primary", use_container_width=True)
 
 st.sidebar.markdown("---")
@@ -156,7 +153,7 @@ def translate_text(client: Groq, text: str, target_language: str) -> str:
     return response.choices[0].message.content.strip()
 
 # ----------------------------------------------------
-# 3. Main Dashboard Layout (Fully Public & High Contrast)
+# 3. Main Dashboard Layout
 # ----------------------------------------------------
 st.title("🎬 AI Subtitle Studio Pro")
 st.caption("Powered by FFmpeg, Groq Whisper v3, and Llama 3.3 70B")
@@ -191,8 +188,8 @@ with col_right:
 # 4. Processing Execution
 # ----------------------------------------------------
 if process_btn:
-    if not st.user.is_logged_in:
-        st.warning("🔐 Authentication Required: Please click **Log in with Google** in the left sidebar or below to process your file.")
+    if not is_logged_in:
+        st.warning("🔐 Authentication Required: Please click **Log in with Google** in the left sidebar to process your file.")
         st.button("🔑 Sign in with Google to Continue", on_click=st.login, type="primary")
     elif not uploaded_file:
         st.error("Please upload a video or audio file first!")
