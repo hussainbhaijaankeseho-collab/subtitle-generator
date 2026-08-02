@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from groq import Groq
 import os
 import tempfile
@@ -18,9 +19,10 @@ st.set_page_config(
         'About': "# AI Subtitle Studio Pro\nGenerate, translate, and export `.srt` and `.txt` subtitles powered by Whisper v3 and Llama 3.3."
     }
 )
-
-st.components.v1.html("""<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-TX2NPKHG');</script>""", height=0)
-st.markdown("""<style>
+components.html(
+    '<meta name="google-site-verification" content="8LT3sweXCpYiqG_Q6Z01_eS9LYY2VZS8SfB7ZeEcFuA" />',
+    height=0
+)
     /* Global Styles */
     .stApp {
         background: #0E1117;
