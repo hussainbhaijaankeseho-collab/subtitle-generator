@@ -6,13 +6,17 @@ import datetime
 import subprocess
 
 # -----------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & GLASSMORPHISM UI STYLING
+# 1. PAGE CONFIGURATION & GLASSMORPHISM UI STYLING (SEO METADATA UPDATED)
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="AI Subtitle Studio Pro",
+    page_title="AI Subtitle Studio Pro | Free Automated Subtitles & Translations",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': 'https://github.com/subtitle-generator',
+        'About': "# AI Subtitle Studio Pro\nGenerate, translate, and export `.srt` and `.txt` subtitles powered by Whisper v3 and Llama 3.3."
+    }
 )
 
 st.markdown("""
