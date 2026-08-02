@@ -1,5 +1,4 @@
 import streamlit as st
-
 # Google Search Console Verification Handler
 if "google" in st.query_params:
     st.write("google-site-verification: googled090b17dfbf01b94.html")
