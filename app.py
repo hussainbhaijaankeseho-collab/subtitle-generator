@@ -13,23 +13,20 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Premium Dark Theme & Glassmorphism Styling
+# Custom High-Contrast Dark Theme & Glassmorphism Styling
 CUSTOM_CSS = """
 <style>
-    /* App Background */
     .stApp {
         background-color: #0E1117;
         color: #FAFAFA;
     }
     
-    /* Title Styling */
     h1 {
         color: #FFFFFF !important;
         font-weight: 700 !important;
         letter-spacing: -0.5px;
     }
 
-    /* Subheaders */
     h3, .stSubheader {
         color: #E0E0E0 !important;
         font-weight: 600 !important;
@@ -61,7 +58,7 @@ CUSTOM_CSS = """
         box-shadow: 0 4px 20px rgba(255, 75, 75, 0.4) !important;
     }
 
-    /* Text Area / Code Box Output Styling */
+    /* Output Code / Text Area */
     textarea {
         background-color: #161B22 !important;
         color: #00FFCC !important;
@@ -71,7 +68,7 @@ CUSTOM_CSS = """
         font-size: 0.9rem !important;
     }
 
-    /* File Uploader Container */
+    /* File Uploader Box */
     div[data-testid="stFileUploader"] {
         background-color: #161B22;
         border: 1px stroke #30363D;
@@ -79,7 +76,7 @@ CUSTOM_CSS = """
         padding: 10px;
     }
 
-    /* Selectbox Input Styling */
+    /* Selectbox Input */
     div[data-baseweb="select"] > div {
         background-color: #161B22 !important;
         border-color: #30363D !important;
@@ -97,27 +94,25 @@ CUSTOM_CSS = """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ----------------------------------------------------
-# 1. Google Account Authentication Gate
+# 1. Sidebar User Profile & Authentication Widget
 # ----------------------------------------------------
-if not st.user.is_logged_in:
-    _, col_center, _ = st.columns([1, 2, 1])
-    with col_center:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        st.title("🔐 AI Subtitle Studio Pro")
-        st.caption("Secure Authentication")
-        st.write("Sign in with your Google account to access audio extraction, transcription, and translation tools.")
-        st.button("🔑 Log in with Google Account", on_click=st.login, type="primary", use_container_width=True)
-    st.stop()
+st.sidebar.title("👤 Account")
+if st.user.is_logged_in:
+    st.sidebar.markdown(f"Logged in as:\n**{st.user.name}**")
+    st.sidebar.caption(f"Email: {st.user.email}")
+    st.sidebar.button("🚪 Log Out", on_click=st.logout, use_container_width=True)
+else:
+    st.sidebar.info("🔒 Log in to process media and export `.srt` or `.txt` files.")
+    st.sidebar.button("🔑 Log in with Google", on_click=st.login, type="primary", use_container_width=True)
 
-# User Sidebar Section
-st.sidebar.title("👤 User Profile")
-st.sidebar.markdown(f"Logged in as:\n**{st.user.name}**")
-st.sidebar.caption(f"Email: {st.user.email}")
 st.sidebar.markdown("---")
-st.sidebar.button("🚪 Log Out", on_click=st.logout, use_container_width=True)
+st.sidebar.subheader("⚡ Platform Capabilities")
+st.sidebar.write("• **Whisper v3**: Ultra-fast transcription")
+st.sidebar.write("• **Llama 3.3 70B**: Context-aware translation")
+st.sidebar.write("• **FFmpeg Engine**: MP4/MKV/WAV audio conversion")
 
 # ----------------------------------------------------
-# 2. Processing Helpers
+# 2. Helper Functions
 # ----------------------------------------------------
 def format_timestamp(seconds: float) -> str:
     td = datetime.timedelta(seconds=seconds)
@@ -161,17 +156,26 @@ def translate_text(client: Groq, text: str, target_language: str) -> str:
     return response.choices[0].message.content.strip()
 
 # ----------------------------------------------------
-# 3. Main Dashboard Layout
+# 3. Main Dashboard Layout (Fully Public)
 # ----------------------------------------------------
 st.title("🎬 AI Subtitle Studio Pro")
-st.caption("Powered by FFmpeg, Groq Whisper v3, and Llama 3.3")
+st.caption("Powered by FFmpeg, Groq Whisper v3, and Llama 3.3 70B")
+
+# Top Highlights
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Whisper Model", "Large v3")
+col2.metric("Translation LLM", "Llama 3.3 70B")
+col3.metric("Supported Formats", "MP4, MP3, WAV, MKV")
+col4.metric("Output Files", ".SRT / .TXT")
+
+st.markdown("---")
 
 col_left, col_right = st.columns([1, 1], gap="large")
 
 with col_left:
     st.subheader("📥 Input & Options")
     target_lang = st.selectbox(
-        "Select Target Language",
+        "Select Target Language for Subtitles",
         ["English", "Spanish", "French", "German", "Japanese", "Chinese", "Arabic", "Hindi", "Urdu"]
     )
     uploaded_file = st.file_uploader(
@@ -182,10 +186,17 @@ with col_left:
 
 with col_right:
     st.subheader("📝 Subtitle Studio Output")
+    st.info("Uploaded content outputs and generated `.srt` timestamps will appear here once processed.")
 
+# ----------------------------------------------------
+# 4. Processing Execution (Requires Google Sign-in)
+# ----------------------------------------------------
 if process_btn:
-    if not uploaded_file:
-        st.error("Please upload a media file first!")
+    if not st.user.is_logged_in:
+        st.warning("🔐 Authentication Required: Please click **Log in with Google** in the left sidebar or below to process your file.")
+        st.button("🔑 Sign in with Google to Continue", on_click=st.login, type="primary")
+    elif not uploaded_file:
+        st.error("Please upload a video or audio file first!")
     else:
         api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
         if not api_key:
@@ -195,7 +206,7 @@ if process_btn:
             status = st.empty()
             
             try:
-                # Save temp file
+                # Save uploaded temp file
                 ext = os.path.splitext(uploaded_file.name)[1]
                 with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
                     tmp.write(uploaded_file.read())
@@ -215,7 +226,7 @@ if process_btn:
                     )
 
                 # 3. Format & Translate
-                status.info("⏳ Step 3/3: Processing subtitles & translation...")
+                status.info("⏳ Step 3/3: Formatting subtitles & translating via Llama 3.3...")
                 srt_content = ""
                 txt_content = ""
                 segments = getattr(transcription, 'segments', [])
@@ -270,3 +281,31 @@ if process_btn:
             except Exception as e:
                 status.empty()
                 st.error(f"Error processing file: {e}")
+
+# ----------------------------------------------------
+# 5. Public Platform Features & FAQ Section
+# ----------------------------------------------------
+st.markdown("<br><hr><br>", unsafe_allow_html=True)
+st.subheader("💡 Frequently Asked Questions & Features")
+
+faq_col1, faq_col2 = st.columns(2)
+
+with faq_col1:
+    with st.expander("❓ How does the subtitle generation work?"):
+        st.write("When you upload a video or audio file, FFmpeg extracts the high-quality audio track locally on the server. The audio is sent to Groq's Whisper v3 hardware for near-instant transcription, and optionally translated using Llama 3.3.")
+
+    with st.expander("❓ Which file formats are supported?"):
+        st.write("We support `.mp4`, `.mp3`, `.wav`, `.mkv`, `.mov`, and `.flac` files up to Streamlit's standard upload limit.")
+
+    with st.expander("❓ Why is Google Login required to generate subtitles?"):
+        st.write("Google login ensures fair usage across all users and prevents automated bot spam from overloading the API infrastructure.")
+
+with faq_col2:
+    with st.expander("❓ Can I translate subtitles to other languages?"):
+        st.write("Yes! You can choose from English, Spanish, French, German, Japanese, Chinese, Arabic, Hindi, and Urdu. The Llama 3.3 70B model translates each segment while maintaining natural timing.")
+
+    with st.expander("❓ What download formats are provided?"):
+        st.write("You receive both standard `.srt` files (with precise timestamps ready to import into Premiere Pro, DaVinci Resolve, or YouTube) and clean `.txt` full transcriptions.")
+
+    with st.expander("❓ Are my uploaded files saved on the server?"):
+        st.write("No. Temporary files are processed inside isolated memory paths and deleted immediately after subtitle generation.")
