@@ -19,7 +19,7 @@ st.set_page_config(
     }
 )
 
-st.markdown("""
+st.markdown("""<meta name="google-site-verification" content="8LT3sweXCpYiqG_Q6Z01_eS9LYY2VZS8SfB7ZeEcFuA" />
 <style>
     /* Global Styles */
     .stApp {
