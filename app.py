@@ -4,6 +4,7 @@ from groq import Groq
 import os
 import tempfile
 import datetime
+import subprocess
 
 # -----------------------------------------------------------------------------
 # 1. PAGE CONFIG & STYLING
@@ -47,8 +48,19 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. HELPER FUNCTIONS FOR SRT & TRANSLATION
+# 2. HELPER FUNCTIONS: FFMPEG AUDIO EXTRACTION, SRT & TRANSLATION
 # -----------------------------------------------------------------------------
+def extract_and_convert_audio(input_file_path: str) -> str:
+    """Uses ffmpeg to extract audio into lightweight 16kHz mono FLAC for optimal Groq API performance."""
+    output_audio_path = os.path.splitext(input_file_path)[0] + "_processed.flac"
+    cmd = [
+        "ffmpeg", "-y", "-i", input_file_path,
+        "-ar", "16000", "-ac", "1", "-map", "0:a",
+        "-c:a", "flac", output_audio_path
+    ]
+    subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+    return output_audio_path
+
 def format_timestamp(seconds: float) -> str:
     """Converts seconds into SRT timestamp format 00:00:00,000"""
     td = datetime.timedelta(seconds=seconds)
@@ -60,11 +72,11 @@ def format_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millisecs:03d}"
 
 def translate_text(groq_client, text: str, target_lang: str) -> str:
-    """Translates a single subtitle line using Groq's Llama-3 model."""
+    """Translates subtitle line using Groq's Llama 3.3 model."""
     if target_lang == "Original Audio Language":
         return text
         
-    prompt = f"Translate the following subtitle text to {target_lang}. Return ONLY the direct translation, preserving original tone and brevity without extra quotes or conversational response:\n\n{text}"
+    prompt = f"Translate the following subtitle text to {target_lang}. Return ONLY the direct translation, preserving tone and brevity:\n\n{text}"
     response = groq_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
@@ -96,7 +108,7 @@ if "token" not in st.session_state:
         st.markdown("""
         <div class="css-card" style="text-align: center;">
             <h1 class="main-title">🔒 AI Subtitle Studio</h1>
-            <p class="sub-title">High-performance automated subtitle generation powered by Groq & Whisper v3</p>
+            <p class="sub-title">Automated subtitle generation powered by Groq & Whisper v3</p>
             <hr style="border-color: rgba(255,255,255,0.1); margin: 20px 0;">
             <p style="color: #D1D5DB;">Sign in with Google to access your dashboard.</p>
         </div>
@@ -132,15 +144,15 @@ else:
             st.rerun()
 
     st.markdown('<h1 class="main-title">🎬 AI Subtitle Studio</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-title">Transcribe & Translate Subtitles into Any Language using Groq</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Transcribe & Translate Subtitles into Any Language using Groq & FFmpeg</p>', unsafe_allow_html=True)
 
     m1, m2, m3 = st.columns(3)
     with m1:
         st.metric(label="Transcription Model", value="Whisper v3", delta="Groq")
     with m2:
-        st.metric(label="Translation Engine", value="Llama 3.3", delta="Groq")
+        st.metric(label="Audio Engine", value="FFmpeg 16kHz", delta="Active")
     with m3:
-        st.metric(label="Processing Speed", value="Ultra-Fast", delta="Optimal")
+        st.metric(label="Translation Engine", value="Llama 3.3", delta="Groq")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -150,28 +162,12 @@ else:
         st.markdown("### 🌐 Target Subtitle Language")
         
         target_languages = [
-            "Original Audio Language",
-            "English",
-            "Urdu",
-            "Spanish",
-            "French",
-            "German",
-            "Japanese",
-            "Chinese",
-            "Arabic",
-            "Hindi"
+            "Original Audio Language", "English", "Urdu", "Spanish", 
+            "French", "German", "Japanese", "Chinese", "Arabic", "Hindi"
         ]
         
-        selected_target_lang = st.selectbox(
-            "Select Desired Output Subtitle Language", 
-            target_languages,
-            help="Subtitles will be automatically translated into this language."
-        )
-
-        uploaded_file = st.file_uploader(
-            "Upload Audio or Video File", 
-            type=["mp4", "mp3", "wav", "m4a", "mov", "mkv"]
-        )
+        selected_target_lang = st.selectbox("Select Target Subtitle Language", target_languages)
+        uploaded_file = st.file_uploader("Upload Audio or Video File", type=["mp4", "mp3", "wav", "m4a", "mov", "mkv"])
         
         if uploaded_file:
             st.success(f"File **{uploaded_file.name}** uploaded ({round(uploaded_file.size / (1024 * 1024), 2)} MB)")
@@ -190,16 +186,24 @@ else:
                 st.error("Missing `GROQ_API_KEY` in Streamlit Secrets!")
             else:
                 groq_client = Groq(api_key=GROQ_API_KEY)
+                tmp_path = None
+                processed_audio_path = None
                 
-                with st.spinner("⚡ Step 1: Transcribing audio with Whisper-large-v3..."):
+                try:
+                    # Save raw file temporarily
                     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp_file:
                         tmp_file.write(uploaded_file.read())
                         tmp_path = tmp_file.name
 
-                    try:
-                        with open(tmp_path, "rb") as audio_file:
+                    # 1. FFmpeg Conversion Step
+                    with st.spinner("🎙️ Extracting & optimizing audio track with FFmpeg..."):
+                        processed_audio_path = extract_and_convert_audio(tmp_path)
+
+                    # 2. Whisper Transcription Step
+                    with st.spinner("⚡ Running Whisper-large-v3 transcription..."):
+                        with open(processed_audio_path, "rb") as audio_file:
                             transcript = groq_client.audio.transcriptions.create(
-                                file=(uploaded_file.name, audio_file.read()),
+                                file=(os.path.basename(processed_audio_path), audio_file.read()),
                                 model="whisper-large-v3",
                                 response_format="verbose_json"
                             )
@@ -217,10 +221,8 @@ else:
                             end_time = format_timestamp(segment.get('end', 0) if isinstance(segment, dict) else segment.end)
                             raw_text = (segment.get('text', '') if isinstance(segment, dict) else segment.text).strip()
                             
-                            # Translate line if multi-language selected
                             final_text = translate_text(groq_client, raw_text, selected_target_lang)
                             
-                            # Build SRT block
                             srt_entry = f"{idx + 1}\n{start_time} --> {end_time}\n{final_text}\n"
                             srt_output.append(srt_entry)
                             txt_output.append(final_text)
@@ -229,7 +231,6 @@ else:
                                 progress_bar.progress((idx + 1) / total_segments, text=f"Translating segment {idx+1}/{total_segments}...")
                         
                         progress_bar.empty()
-                        
                         final_subtitles = "\n".join(srt_output) if "SubRip" in export_format else "\n".join(txt_output)
                         
                         st.markdown(f"#### Generated Subtitles ({selected_target_lang}):")
@@ -244,10 +245,13 @@ else:
                             use_container_width=True
                         )
 
-                    except Exception as e:
-                        st.error(f"Error processing audio: {str(e)}")
-                    finally:
-                        if os.path.exists(tmp_path):
-                            os.remove(tmp_path)
+                except Exception as e:
+                    st.error(f"Error processing media: {str(e)}")
+                finally:
+                    # Clean up temp files
+                    if tmp_path and os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+                    if processed_audio_path and os.path.exists(processed_audio_path):
+                        os.remove(processed_audio_path)
         else:
-            st.info("Upload a file, choose your target subtitle language, and click **Transcribe**.")
+            st.info("Upload media on the left, select target language, and click **Transcribe**.")
