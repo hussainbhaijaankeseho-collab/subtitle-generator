@@ -4,6 +4,29 @@ import tempfile
 import subprocess
 import os
 
+# Function to convert Groq's verbose_json segments to SRT format
+def convert_to_srt(segments):
+    srt_output = ""
+    for idx, segment in enumerate(segments, start=1):
+        start = segment['start']
+        end = segment['end']
+        text = segment['text'].strip()
+
+        # Format timestamps into HH:MM:SS,mmm
+        def format_time(seconds):
+            hrs = int(seconds // 3600)
+            mins = int((seconds % 3600) // 60)
+            secs = int(seconds % 60)
+            msecs = int((seconds % 1) * 1000)
+            return f"{hrs:02d}:{mins:02d}:{secs:02d},{msecs:03d}"
+
+        start_str = format_time(start)
+        end_str = format_time(end)
+
+        srt_output += f"{idx}\n{start_str} --> {end_str}\n{text}\n\n"
+    
+    return srt_output
+
 # 1. Custom Styling (Modern Dark Mode UI)
 st.set_page_config(
     page_title="AI Subtitle Generator",
@@ -13,13 +36,11 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    /* Main Background & Text Color */
     .stApp {
         background-color: #0E1117;
         color: #E0E0E0;
     }
     
-    /* Header Styling */
     h1 {
         color: #00F2FE;
         font-family: 'Inter', sans-serif;
@@ -27,7 +48,6 @@ st.markdown("""
         text-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
     }
     
-    /* File Uploader Container */
     [data-testid="stFileUploader"] {
         border: 2px dashed #00F2FE;
         border-radius: 12px;
@@ -35,7 +55,6 @@ st.markdown("""
         background-color: #161B22;
     }
 
-    /* Primary Button Styling */
     .stButton > button {
         background: linear-gradient(45deg, #4FACFE 0%, #00F2FE 100%);
         color: #000000;
@@ -53,7 +72,6 @@ st.markdown("""
         color: #000000;
     }
 
-    /* Text Area Styling */
     textarea {
         background-color: #161B22 !important;
         color: #00FF87 !important;
@@ -68,7 +86,7 @@ st.markdown("""
 st.title("🎬 Fast AI Subtitle Generator")
 st.write("Generate `.srt` subtitles from your video or audio files using Groq Whisper.")
 
-# 3. Client Initialization (Automated via Streamlit Secrets)
+# 3. Client Initialization
 try:
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except Exception as e:
@@ -85,7 +103,6 @@ if uploaded_file is not None:
     if st.button("🚀 Generate Subtitles"):
         with st.spinner("Processing file... Extracting audio & generating subtitles..."):
             
-            # Save uploaded file into a temporary file
             with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as temp_file:
                 temp_file.write(uploaded_file.read())
                 input_path = temp_file.name
@@ -93,7 +110,7 @@ if uploaded_file is not None:
             mp3_path = input_path + "_converted.mp3"
 
             try:
-                # Convert video/audio to compressed MP3 using ffmpeg
+                # Convert to lightweight MP3 using ffmpeg
                 cmd = [
                     "ffmpeg", "-y", "-i", input_path,
                     "-vn", "-ar", "16000", "-ac", "1", "-b:a", "128k",
@@ -101,27 +118,30 @@ if uploaded_file is not None:
                 ]
                 subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-                # Send file stream to Groq Whisper API (FIX APPLIED HERE)
+                # Send to Groq Whisper API with response_format="verbose_json"
                 with open(mp3_path, "rb") as audio_file:
-                    transcription = client.audio.transcriptions.create(
+                    response = client.audio.transcriptions.create(
                         file=audio_file,
                         model="whisper-large-v3-turbo",
-                        response_format="srt"
+                        response_format="verbose_json"
                     )
+
+                # Convert JSON segments to SRT
+                srt_output = convert_to_srt(response.segments)
 
                 st.success("✨ Subtitles successfully generated!")
                 
-                # Download Button for SRT
+                # Download Button
                 st.download_button(
                     label="📥 Download Subtitles (.srt)",
-                    data=transcription,
+                    data=srt_output,
                     file_name=f"{os.path.splitext(uploaded_file.name)[0]}.srt",
                     mime="text/plain"
                 )
 
                 # SRT Output Preview
                 st.subheader("Subtitle Preview")
-                st.text_area("Generated SRT Output", transcription, height=250)
+                st.text_area("Generated SRT Output", srt_output, height=250)
 
             except subprocess.CalledProcessError as e:
                 st.error("Error converting media with ffmpeg. Check packages.txt deployment.")
@@ -129,7 +149,6 @@ if uploaded_file is not None:
                 st.error(f"Error generating subtitles: {str(e)}")
             
             finally:
-                # Temporary file cleanup
                 if os.path.exists(input_path):
                     os.remove(input_path)
                 if os.path.exists(mp3_path):
