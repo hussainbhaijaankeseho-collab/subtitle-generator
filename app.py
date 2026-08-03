@@ -1,284 +1,230 @@
+import os
+import subprocess
+import tempfile
 import streamlit as st
 from groq import Groq
-import os
-import tempfile
-import datetime
-import subprocess
 
-# Page Configuration
+# --- Page Configuration ---
 st.set_page_config(
-    page_title="AI Subtitle Studio Pro", 
-    page_icon="🎬", 
+    page_title="AI Subtitle Studio Pro | Free Translation & Generation",
+    page_icon="🎬",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# High-Contrast Bright Dark Theme CSS
-CUSTOM_CSS = """
-<style>
-    .stApp {
-        background-color: #0E1117;
-        color: #FFFFFF !important;
-    }
-    
-    h1, h2, h3, h4, .stHeader {
-        color: #FFFFFF !important;
-        font-weight: 700 !important;
-    }
+# --- High-Contrast Dark Theme Styling & SEO Enhancements ---
+st.markdown(
+    """
+    <style>
+        .stApp {
+            background-color: #0d1117;
+            color: #f0f6fc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        [data-testid="stSidebar"] {
+            background-color: #161b22;
+            border-right: 1px solid #30363d;
+        }
+        .glass-card {
+            background: rgba(22, 27, 34, 0.7);
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        h1, h2, h3 {
+            color: #58a6ff !important;
+            font-weight: 700;
+        }
+        p, label, span, .stMarkdown {
+            color: #c9d1d9 !important;
+        }
+        .stButton>button {
+            background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 600;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+        .stButton>button:hover {
+            background: linear-gradient(135deg, #2ea043 0%, #3fb950 100%);
+            box-shadow: 0 4px 12px rgba(46, 160, 67, 0.4);
+        }
+        .streamlit-expanderHeader {
+            background-color: #161b22 !important;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            color: #58a6ff !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-    label, .stCaption, p, span, div {
-        color: #E0E6ED !important;
-    }
+st.markdown(
+    """
+    <head>
+        <meta name="description" content="AI Subtitle Studio Pro - Free online automatic subtitle generator, video transcription using Groq Whisper v3, and multi-language translation powered by Llama 3.">
+        <meta name="keywords" content="subtitle generator, AI subtitle creator, video to text, speech to text, translation, Groq Whisper, Llama 3, Streamlit app">
+        <meta name="author" content="AI Subtitle Studio Pro">
+    </head>
+    """,
+    unsafe_allow_html=True,
+)
 
-    div[data-testid="stMetricValue"] > div {
-        color: #00FFCC !important;
-        font-weight: 700 !important;
-        font-size: 1.8rem !important;
-    }
-    div[data-testid="stMetricLabel"] > div {
-        color: #FFFFFF !important;
-        font-weight: 600 !important;
-    }
+# --- Helper Functions ---
+def get_media_metadata(input_file_path):
+    try:
+        cmd = [
+            "ffprobe", "-v", "quiet", "-print_format", "json",
+            "-show_streams", "-show_format", input_file_path
+        ]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        import json
+        data = json.loads(result.stdout)
+        
+        duration = float(data.get("format", {}).get("duration", 0))
+        audio_languages = [
+            f"{s.get('codec_name', 'unknown')} (Lang: {s.get('tags', {}).get('language', 'unknown').lower()})"
+            for s in data.get("streams", []) if s.get("codec_type") == "audio"
+        ]
+        return {"duration": duration, "audio_streams": audio_languages if audio_languages else ["Default Audio Track"]}
+    except Exception:
+        return {"duration": 0, "audio_streams": ["Standard Audio Track"]}
 
-    div[data-testid="stVerticalBlock"] > div[style*="flex"] {
-        background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        padding: 1.5rem;
-    }
-
-    .stButton > button {
-        background: linear-gradient(135deg, #FF4B4B 0%, #B30000 100%) !important;
-        color: #FFFFFF !important;
-        border: none !important;
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-        padding: 0.6rem 1.2rem !important;
-    }
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 20px rgba(255, 75, 75, 0.4) !important;
-    }
-
-    textarea {
-        background-color: #161B22 !important;
-        color: #00FFCC !important;
-        border: 1px solid #30363D !important;
-        border-radius: 8px !important;
-        font-family: 'Fira Code', 'Courier New', monospace !important;
-    }
-
-    div[data-testid="stAlert"] {
-        background-color: #161B22 !important;
-        border: 1px solid #30363D !important;
-        color: #00FFCC !important;
-    }
-
-    section[data-testid="stSidebar"] {
-        background-color: #161B22 !important;
-        border-right: 1px solid #30363D !important;
-    }
-</style>
-"""
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
-
-# ----------------------------------------------------
-# 1. Sidebar Platform Info (Google Login Removed)
-# ----------------------------------------------------
-st.sidebar.title("⚡ Platform Capabilities")
-st.sidebar.write("• **Whisper v3**: Ultra-fast transcription")
-st.sidebar.write("• **Llama 3.3 70B**: Context-aware translation")
-st.sidebar.write("• **FFmpeg Engine**: MP4/MKV/WAV audio conversion")
-st.sidebar.markdown("---")
-st.sidebar.caption("AI Subtitle Studio Pro is ready for instant media processing.")
-
-# ----------------------------------------------------
-# 2. Helper Functions
-# ----------------------------------------------------
-def format_timestamp(seconds: float) -> str:
-    td = datetime.timedelta(seconds=seconds)
-    total_seconds = int(td.total_seconds())
-    hours = total_seconds // 3600
-    minutes = (total_seconds % 3600) // 60
-    secs = total_seconds % 60
-    millis = int((seconds - int(seconds)) * 1000)
-    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
-
-def extract_audio(input_file_path: str) -> str:
-    temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-    temp_audio_path = temp_audio.name
-    temp_audio.close()
-
+def extract_audio(input_file_path, output_audio_path):
     cmd = [
         "ffmpeg", "-y", "-i", input_file_path,
-        "-vn", "-acodec", "libmp3lame",
-        "-ar", "16000", "-ac", "1", "-q:a", "2",
-        temp_audio_path
+        "-vn", "-acodec", "libmp3lame", "-ar", "16000", "-ac", "1", output_audio_path
     ]
-    process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if process.returncode != 0:
-        raise Exception(f"FFmpeg extraction failed: {process.stderr.decode('utf-8')}")
-    return temp_audio_path
+    subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
-def translate_text(client: Groq, text: str, target_language: str) -> str:
-    if target_language.lower() == "english":
-        return text
+def chunk_text_by_lines(text, max_lines=60):
+    lines = text.split("\n")
+    chunks, current_chunk = [], []
+    for line in lines:
+        current_chunk.append(line)
+        if len(current_chunk) >= max_lines:
+            chunks.append("\n".join(current_chunk))
+            current_chunk = []
+    if current_chunk:
+        chunks.append("\n".join(current_chunk))
+    return chunks
 
-    prompt = (
-        f"Translate the following subtitle text to {target_language}. "
-        "Maintain tone and context. Return ONLY the translation, no explanation:\n\n"
-        f"{text}"
-    )
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,
-    )
-    return response.choices[0].message.content.strip()
+# --- Main Sidebar UI ---
+with st.sidebar:
+    st.markdown("## ⚙️ Studio Controls")
+    api_key_input = st.text_input("Enter Groq API Key", type="password")
+    
+    st.markdown("---")
+    st.markdown("### 🤖 Model Configurations")
+    selected_model = st.selectbox("Select Translation Model", ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"], index=0)
+    target_language = st.selectbox("Target Translation Language", ["English", "Urdu", "Spanish", "French", "German", "Arabic", "Hindi", "Chinese", "Japanese"], index=0)
+    export_format = st.selectbox("Subtitle Export Format", [".srt", ".vtt", ".txt"], index=0)
 
-# ----------------------------------------------------
-# 3. Main Dashboard Layout
-# ----------------------------------------------------
-st.title("🎬 AI Subtitle Studio Pro")
-st.caption("Powered by FFmpeg, Groq Whisper v3, and Llama 3.3 70B")
+    st.markdown("---")
+    st.markdown("### 📊 Web App Info")
+    st.info("**Status:** Online & Public\n\n**Engine:** Groq Whisper v3 + Llama 3")
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Whisper Model", "Large v3")
-col2.metric("Translation LLM", "Llama 3.3 70B")
-col3.metric("Supported Formats", "MP4, MP3, WAV, MKV")
-col4.metric("Output Files", ".SRT / .TXT")
+# --- Main Application Layout ---
+st.markdown(
+    """
+    <div class="glass-card">
+        <h1>🎬 AI Subtitle Studio Pro</h1>
+        <p>Transform your video and audio files into precise transcripts, run smart FFmpeg track analysis, and translate subtitles instantly using cutting-edge open-source AI models entirely for free.</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
-st.markdown("---")
+uploaded_file = st.file_uploader("Upload Video or Audio File", type=["mp4", "mkv", "mov", "mp3", "wav", "m4a"])
 
-col_left, col_right = st.columns([1, 1], gap="large")
+if uploaded_file is not None:
+    tfile = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1])
+    tfile.write(uploaded_file.read())
+    tfile.close()
 
-with col_left:
-    st.subheader("📥 Input & Options")
-    target_lang = st.selectbox(
-        "Select Target Language for Subtitles",
-        ["English", "Spanish", "French", "German", "Japanese", "Chinese", "Arabic", "Hindi", "Urdu"]
-    )
-    uploaded_file = st.file_uploader(
-        "Upload Video or Audio File", 
-        type=["mp4", "mp3", "wav", "mkv", "mov", "flac"]
-    )
-    process_btn = st.button("🚀 Process Media", type="primary", use_container_width=True)
+    with st.spinner("Analyzing media streams and metadata via FFmpeg..."):
+        metadata = get_media_metadata(tfile.name)
 
-with col_right:
-    st.subheader("📝 Subtitle Studio Output")
-    st.info("Uploaded content outputs and generated .srt timestamps will appear here once processed.")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f'<div class="glass-card"><h3>📁 File Overview</h3><p><b>Filename:</b> {uploaded_file.name}</p><p><b>Duration:</b> {round(metadata["duration"], 2)} seconds</p></div>', unsafe_allow_html=True)
+    with col2:
+        tracks = "".join([f"<li>{stream}</li>" for stream in metadata['audio_streams']])
+        st.markdown(f'<div class="glass-card"><h3>🔍 Track Language Analysis</h3><ul>{tracks}</ul></div>', unsafe_allow_html=True)
 
-# ----------------------------------------------------
-# 4. Processing Execution (Direct & Unrestricted)
-# ----------------------------------------------------
-if process_btn:
-    if not uploaded_file:
-        st.error("Please upload a video or audio file first!")
-    else:
-        api_key = os.environ.get("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
-        if not api_key:
-            st.error("GROQ_API_KEY is missing from secrets.")
+    if st.button("🚀 Generate & Translate Subtitles"):
+        if not api_key_input:
+            st.error("Please provide a valid Groq API Key in the sidebar.")
         else:
-            client = Groq(api_key=api_key)
-            status = st.empty()
-            
             try:
-                ext = os.path.splitext(uploaded_file.name)[1]
-                with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
-                    tmp.write(uploaded_file.read())
-                    tmp_input_path = tmp.name
+                client = Groq(api_key=api_key_input)
+                audio_path = tfile.name + ".mp3"
 
-                status.info("⏳ Step 1/3: Extracting audio via FFmpeg...")
-                audio_path = extract_audio(tmp_input_path)
+                # Step 1: Audio Extraction
+                progress_bar = st.progress(0)
+                st.info("Step 1/3: Extracting clean audio track via FFmpeg...")
+                extract_audio(tfile.name, audio_path)
+                progress_bar.progress(33)
 
-                status.info("⏳ Step 2/3: Transcribing audio with Groq Whisper v3...")
-                with open(audio_path, "rb") as f:
-                    transcription = client.audio.transcriptions.create(
-                        file=(os.path.basename(audio_path), f.read()),
+                # Step 2: Transcription
+                st.info("Step 2/3: Transcribing audio utilizing Groq Whisper v3...")
+                with open(audio_path, "rb") as file_to_transcribe:
+                    raw_subtitles = client.audio.transcriptions.create(
+                        file=(os.path.basename(audio_path), file_to_transcribe.read()),
                         model="whisper-large-v3",
-                        response_format="verbose_json",
+                        response_format="srt",
                     )
+                progress_bar.progress(66)
 
-                status.info("⏳ Step 3/3: Formatting subtitles & translating via Llama 3.3...")
-                srt_content = ""
-                txt_content = ""
-                segments = getattr(transcription, 'segments', [])
+                # Step 3: Translation
+                translated_output = raw_subtitles
+                if target_language != "English":
+                    st.info(f"Step 3/3: Translating subtitles into {target_language} using {selected_model} (Smart Chunking active)...")
+                    chunks = chunk_text_by_lines(raw_subtitles, max_lines=50)
+                    translated_chunks = []
+                    for chunk in chunks:
+                        prompt = f"Translate the following subtitle blocks into {target_language}. Maintain the precise SRT timestamps, sequence numbers, and formatting layout. Do not add introductory text:\n\n{chunk}"
+                        response = client.chat.completions.create(
+                            model=selected_model,
+                            messages=[{"role": "user", "content": prompt}],
+                            temperature=0.2,
+                        )
+                        translated_chunks.append(response.choices[0].message.content)
+                    translated_output = "\n\n".join(translated_chunks)
 
-                if segments:
-                    for idx, seg in enumerate(segments, start=1):
-                        start = format_timestamp(seg['start'])
-                        end = format_timestamp(seg['end'])
-                        text = seg['text'].strip()
+                progress_bar.progress(100)
+                st.success("Subtitle processing and translation completed successfully!")
 
-                        if target_lang != "English":
-                            text = translate_text(client, text, target_lang)
+                # Formatting
+                final_content = translated_output
+                mime_type = "text/plain"
+                if export_format == ".vtt":
+                    final_content = "WEBVTT\n\n" + final_content.replace(",", ".")
+                    mime_type = "text/vtt"
 
-                        srt_content += f"{idx}\n{start} --> {end}\n{text}\n\n"
-                        txt_content += f"{text} "
-                else:
-                    raw_text = transcription.text
-                    if target_lang != "English":
-                        raw_text = translate_text(client, raw_text, target_lang)
-                    txt_content = raw_text
-                    srt_content = f"1\n00:00:00,000 --> 00:05:00,000\n{raw_text}\n\n"
+                st.markdown('<div class="glass-card"><h3>📝 Result Preview</h3></div>', unsafe_allow_html=True)
+                st.text_area("Subtitle Data Viewer", final_content, height=300)
 
-                if os.path.exists(tmp_input_path):
-                    os.remove(tmp_input_path)
+                output_filename = os.path.splitext(uploaded_file.name)[0] + f"_{target_language.lower()}{export_format}"
+                st.download_button(label=f"📥 Download Subtitles ({export_format})", data=final_content, file_name=output_filename, mime=mime_type)
+
                 if os.path.exists(audio_path):
                     os.remove(audio_path)
-
-                status.empty()
-
-                with col_right:
-                    st.success("✨ Subtitles generated successfully!")
-                    st.text_area("SRT Preview", srt_content, height=260)
-                    
-                    d1, d2 = st.columns(2)
-                    with d1:
-                        st.download_button(
-                            "📥 Download .SRT",
-                            srt_content,
-                            file_name=f"{os.path.splitext(uploaded_file.name)[0]}.srt",
-                            use_container_width=True
-                        )
-                    with d2:
-                        st.download_button(
-                            "📥 Download .TXT",
-                            txt_content,
-                            file_name=f"{os.path.splitext(uploaded_file.name)[0]}.txt",
-                            use_container_width=True
-                        )
-
             except Exception as e:
-                status.empty()
-                st.error(f"Error processing file: {e}")
+                st.error(f"An error occurred: {e}")
 
-# ----------------------------------------------------
-# 5. Public FAQ Section
-# ----------------------------------------------------
-st.markdown("<br><hr><br>", unsafe_allow_html=True)
-st.subheader("💡 Frequently Asked Questions & Features")
+    if os.path.exists(tfile.name):
+        os.remove(tfile.name)
 
-faq_col1, faq_col2 = st.columns(2)
-
-with faq_col1:
-    with st.expander("❓ How does the subtitle generation work?"):
-        st.write("When you upload a video or audio file, FFmpeg extracts the audio track locally. The audio is sent to Groq's Whisper v3 engine for fast transcription, and translated using Llama 3.3.")
-
-    with st.expander("❓ Which file formats are supported?"):
-        st.write("We support `.mp4`, `.mp3`, `.wav`, `.mkv`, `.mov`, and `.flac` files up to Streamlit's standard upload limit.")
-
-    with st.expander("❓ Do I need an account to generate subtitles?"):
-        st.write("No account or login is required. You can upload media and download your `.srt` and `.txt` files instantly.")
-
-with faq_col2:
-    with st.expander("❓ Can I translate subtitles to other languages?"):
-        st.write("Yes! You can choose from English, Spanish, French, German, Japanese, Chinese, Arabic, Hindi, and Urdu.")
-
-    with st.expander("❓ What download formats are provided?"):
-        st.write("You receive both standard `.srt` files and clean `.txt` full transcriptions.")
-
-    with st.expander("❓ Are my uploaded files saved on the server?"):
-        st.write("No. Files are deleted immediately after subtitle generation.")
+st.markdown("---")
+with st.expander("❓ Frequently Asked Questions & Platform Guide"):
+    st.markdown("""
+    * **How does AI Subtitle Studio Pro process media?** The app uses local FFmpeg binaries to extract audio, Groq's Whisper v3 for transcription, and Llama 3 for translation.
+    * **What is Smart Chunking?** Smart chunking breaks large files into smaller segments before translation to protect against free-tier Token-Per-Minute errors.
+    """)
